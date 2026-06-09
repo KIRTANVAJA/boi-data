@@ -8,6 +8,28 @@ const __dirname = path.dirname(__filename);
 
 const usePostgres = !!(process.env.DATABASE_URL || process.env.PGHOST);
 
+console.log('--- Database Connection Diagnostic ---');
+console.log('usePostgres:', usePostgres);
+console.log('DATABASE_URL present:', !!process.env.DATABASE_URL);
+if (process.env.DATABASE_URL) {
+  try {
+    // Parse connection string safely without exposing passwords
+    const parsed = new URL(process.env.DATABASE_URL);
+    console.log('DATABASE_URL Hostname:', parsed.hostname);
+    console.log('DATABASE_URL Port:', parsed.port || 'default');
+    console.log('DATABASE_URL Database:', parsed.pathname);
+    console.log('DATABASE_URL Username:', parsed.username);
+  } catch (err) {
+    console.log('DATABASE_URL is not a valid URL. Length:', process.env.DATABASE_URL.length);
+    console.log('DATABASE_URL Starts with:', process.env.DATABASE_URL.substring(0, 15) + '...');
+  }
+}
+console.log('PGHOST:', process.env.PGHOST || 'not set');
+console.log('PGDATABASE:', process.env.PGDATABASE || 'not set');
+console.log('PGUSER:', process.env.PGUSER || 'not set');
+console.log('PGPORT:', process.env.PGPORT || 'not set');
+console.log('--------------------------------------');
+
 let pgPool = null;
 let sqliteDb = null;
 
