@@ -140,6 +140,7 @@ export const exec = async (sql) => {
   let schemaSql = sql;
   if (usePostgres) {
     schemaSql = schemaSql.replace(/INTEGER PRIMARY KEY AUTOINCREMENT/g, 'SERIAL PRIMARY KEY');
+    schemaSql = schemaSql.replace(/DATETIME/gi, 'TIMESTAMP');
   }
   
   if (usePostgres) {

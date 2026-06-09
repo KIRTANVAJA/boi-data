@@ -1,4 +1,4 @@
-import { query, run, queryOne } from '../config/sqliteDb.js';
+import { query, run, queryOne, isPostgres } from '../config/sqliteDb.js';
 
 // --- CONTACT REQUESTS ACTIONS ---
 
@@ -112,13 +112,24 @@ export const getDashboardStats = async (req, res, next) => {
     const pendingRequests = pendingRequestsRow ? pendingRequestsRow.count : 0;
 
     // Aggregate Views by Date (Last 7 Days)
-    const viewsTrend = await query(`
-      SELECT strftime('%Y-%m-%d', createdAt) as _id, COUNT(*) as count 
-      FROM page_views 
-      WHERE createdAt >= datetime('now', '-7 days') 
-      GROUP BY _id 
-      ORDER BY _id ASC
-    `);
+    let viewsTrend;
+    if (isPostgres()) {
+      viewsTrend = await query(`
+        SELECT TO_CHAR(createdAt, 'YYYY-MM-DD') as _id, COUNT(*) as count 
+        FROM page_views 
+        WHERE createdAt >= NOW() - INTERVAL '7 days' 
+        GROUP BY _id 
+        ORDER BY _id ASC
+      `);
+    } else {
+      viewsTrend = await query(`
+        SELECT strftime('%Y-%m-%d', createdAt) as _id, COUNT(*) as count 
+        FROM page_views 
+        WHERE createdAt >= datetime('now', '-7 days') 
+        GROUP BY _id 
+        ORDER BY _id ASC
+      `);
+    }
 
     // Aggregate Devices
     const deviceDistribution = await query(`
