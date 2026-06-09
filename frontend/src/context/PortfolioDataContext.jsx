@@ -9,7 +9,7 @@ export const PortfolioDataProvider = ({ children }) => {
 
   const loadData = async () => {
     try {
-      const [profileRes, familyRes, edCarRes, lifestyleRes, projectsRes, achievementsRes, galleryRes] = await Promise.all([
+      const [profileRes, familyRes, edCarRes, lifestyleRes, projectsRes, achievementsRes, galleryRes, settingsRes] = await Promise.all([
         apiRequest('/profile'),
         apiRequest('/profile/family'),
         apiRequest('/profile/education-career'),
@@ -17,6 +17,7 @@ export const PortfolioDataProvider = ({ children }) => {
         apiRequest('/portfolio/projects'),
         apiRequest('/portfolio/achievements'),
         apiRequest('/portfolio/gallery'),
+        apiRequest('/profile/settings'),
       ]);
 
       const profile = profileRes.data || {};
@@ -26,6 +27,7 @@ export const PortfolioDataProvider = ({ children }) => {
       const projects = projectsRes.data || [];
       const achievements = achievementsRes.data || [];
       const gallery = galleryRes.data || [];
+      const settings = settingsRes.data || {};
 
       setPortfolioData({
         personal: {
@@ -66,6 +68,10 @@ export const PortfolioDataProvider = ({ children }) => {
         gallery: gallery,
         contact: profile.contactInfo || {}
       });
+
+      if (settings.sectionVisibility) {
+        setVisibilitySettings(settings.sectionVisibility);
+      }
     } catch (err) {
       console.error('Failed to load portfolio context:', err.message);
     } finally {
@@ -269,49 +275,52 @@ export const PortfolioDataProvider = ({ children }) => {
     return true;
   };
 
-  const [visibilitySettings, setVisibilitySettings] = useState(() => {
-    const saved = localStorage.getItem('website_sections_visibility');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {
-        console.error('Failed to parse section visibility settings', e);
-      }
-    }
-    return {
-      hero: true,
-      about: true,
-      education: true,
-      experience: true,
-      skills: true,
-      projects: true,
-      certifications: true,
-      family: true,
-      hobbies: true,
-      gallery: true,
-      contact: true
-    };
+  const [visibilitySettings, setVisibilitySettings] = useState({
+    hero: true,
+    about: true,
+    education: true,
+    experience: true,
+    skills: true,
+    projects: true,
+    certifications: true,
+    family: true,
+    hobbies: true,
+    gallery: true,
+    contact: true
   });
 
-  useEffect(() => {
-    localStorage.setItem('website_sections_visibility', JSON.stringify(visibilitySettings));
-  }, [visibilitySettings]);
+  const toggleSectionVisibility = async (sectionKey) => {
+    const updatedVisibility = {
+      ...visibilitySettings,
+      [sectionKey]: !visibilitySettings[sectionKey]
+    };
+    setVisibilitySettings(updatedVisibility);
 
-  const toggleSectionVisibility = (sectionKey) => {
-    setVisibilitySettings((prev) => ({
-      ...prev,
-      [sectionKey]: !prev[sectionKey]
-    }));
+    try {
+      await apiRequest('/profile/settings', {
+        method: 'PUT',
+        body: { sectionVisibility: updatedVisibility }
+      });
+    } catch (e) {
+      console.error('Failed to update section visibility in database settings:', e.message);
+    }
   };
 
-  const setAllVisibility = (visible) => {
-    setVisibilitySettings((prev) => {
-      const next = {};
-      Object.keys(prev).forEach((key) => {
-        next[key] = visible;
-      });
-      return next;
+  const setAllVisibility = async (visible) => {
+    const updatedVisibility = {};
+    Object.keys(visibilitySettings).forEach((key) => {
+      updatedVisibility[key] = visible;
     });
+    setVisibilitySettings(updatedVisibility);
+
+    try {
+      await apiRequest('/profile/settings', {
+        method: 'PUT',
+        body: { sectionVisibility: updatedVisibility }
+      });
+    } catch (e) {
+      console.error('Failed to update all sections visibility in database settings:', e.message);
+    }
   };
 
   return (

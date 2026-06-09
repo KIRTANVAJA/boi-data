@@ -282,11 +282,12 @@ export const getSettings = async (req, res, next) => {
     let settings = await queryOne('SELECT * FROM settings LIMIT 1');
     if (!settings) {
       const result = await run(
-        'INSERT INTO settings (theme, seo, sectionOrder) VALUES (?, ?, ?)',
+        'INSERT INTO settings (theme, seo, sectionOrder, sectionVisibility) VALUES (?, ?, ?, ?)',
         [
-          JSON.stringify({ primaryColor: '#000000', accentColor: '#D4AF37', isDarkMode: true, fontFamily: 'Inter' }),
+          JSON.stringify({ primaryColor: '#FFFFFF', accentColor: '#D4AF37', isDarkMode: false, fontFamily: 'Inter' }),
           JSON.stringify({ metaTitle: 'My Digital Biodata', metaDescription: 'Digital CV', keywords: 'biodata', ogImage: '' }),
-          JSON.stringify(['hero', 'personal', 'family', 'education', 'career', 'projects', 'achievements', 'gallery', 'lifestyle', 'contact'])
+          JSON.stringify(['hero', 'personal', 'family', 'education', 'career', 'projects', 'achievements', 'gallery', 'lifestyle', 'contact']),
+          JSON.stringify({ hero: true, about: true, education: true, experience: true, skills: true, projects: true, certifications: true, family: true, hobbies: true, gallery: true, contact: true })
         ]
       );
       settings = await queryOne('SELECT * FROM settings WHERE id = ?', [result.id]);
@@ -295,6 +296,9 @@ export const getSettings = async (req, res, next) => {
     settings.theme = safeParse(settings.theme);
     settings.seo = safeParse(settings.seo);
     settings.sectionOrder = safeParse(settings.sectionOrder, []);
+    settings.sectionVisibility = safeParse(settings.sectionVisibility, {
+      hero: true, about: true, education: true, experience: true, skills: true, projects: true, certifications: true, family: true, hobbies: true, gallery: true, contact: true
+    });
     settings._id = settings.id;
 
     res.status(200).json({ success: true, data: settings });
@@ -308,11 +312,12 @@ export const updateSettings = async (req, res, next) => {
     let settings = await queryOne('SELECT * FROM settings LIMIT 1');
     if (!settings) {
       const result = await run(
-        'INSERT INTO settings (theme, seo, sectionOrder) VALUES (?, ?, ?)',
+        'INSERT INTO settings (theme, seo, sectionOrder, sectionVisibility) VALUES (?, ?, ?, ?)',
         [
-          JSON.stringify({ primaryColor: '#000000', accentColor: '#D4AF37', isDarkMode: true, fontFamily: 'Inter' }),
+          JSON.stringify({ primaryColor: '#FFFFFF', accentColor: '#D4AF37', isDarkMode: false, fontFamily: 'Inter' }),
           JSON.stringify({ metaTitle: 'My Digital Biodata', metaDescription: 'Digital CV', keywords: 'biodata', ogImage: '' }),
-          JSON.stringify(['hero', 'personal', 'family', 'education', 'career', 'projects', 'achievements', 'gallery', 'lifestyle', 'contact'])
+          JSON.stringify(['hero', 'personal', 'family', 'education', 'career', 'projects', 'achievements', 'gallery', 'lifestyle', 'contact']),
+          JSON.stringify({ hero: true, about: true, education: true, experience: true, skills: true, projects: true, certifications: true, family: true, hobbies: true, gallery: true, contact: true })
         ]
       );
       settings = await queryOne('SELECT * FROM settings WHERE id = ?', [result.id]);
@@ -321,16 +326,20 @@ export const updateSettings = async (req, res, next) => {
     const theme = req.body.theme !== undefined ? JSON.stringify(req.body.theme) : settings.theme;
     const seo = req.body.seo !== undefined ? JSON.stringify(req.body.seo) : settings.seo;
     const sectionOrder = req.body.sectionOrder !== undefined ? JSON.stringify(req.body.sectionOrder) : settings.sectionOrder;
+    const sectionVisibility = req.body.sectionVisibility !== undefined ? JSON.stringify(req.body.sectionVisibility) : settings.sectionVisibility;
 
     await run(
-      `UPDATE settings SET theme = ?, seo = ?, sectionOrder = ? WHERE id = ?`,
-      [theme, seo, sectionOrder, settings.id]
+      `UPDATE settings SET theme = ?, seo = ?, sectionOrder = ?, sectionVisibility = ? WHERE id = ?`,
+      [theme, seo, sectionOrder, sectionVisibility, settings.id]
     );
 
     const updatedSettings = await queryOne('SELECT * FROM settings WHERE id = ?', [settings.id]);
     updatedSettings.theme = safeParse(updatedSettings.theme);
     updatedSettings.seo = safeParse(updatedSettings.seo);
     updatedSettings.sectionOrder = safeParse(updatedSettings.sectionOrder, []);
+    updatedSettings.sectionVisibility = safeParse(updatedSettings.sectionVisibility, {
+      hero: true, about: true, education: true, experience: true, skills: true, projects: true, certifications: true, family: true, hobbies: true, gallery: true, contact: true
+    });
     updatedSettings._id = updatedSettings.id;
 
     await logActivity(req.user?.username || 'System', 'UPDATE_SETTINGS', 'Updated system layout theme & SEO keywords', req);
@@ -386,6 +395,9 @@ export const exportBackup = async (req, res, next) => {
       settings.theme = safeParse(settings.theme);
       settings.seo = safeParse(settings.seo);
       settings.sectionOrder = safeParse(settings.sectionOrder, []);
+      settings.sectionVisibility = safeParse(settings.sectionVisibility, {
+        hero: true, about: true, education: true, experience: true, skills: true, projects: true, certifications: true, family: true, hobbies: true, gallery: true, contact: true
+      });
       settings._id = settings.id;
     }
 
@@ -510,12 +522,13 @@ export const importBackup = async (req, res, next) => {
     if (backup.settings) {
       await run('DELETE FROM settings');
       await run(
-        `INSERT INTO settings (id, theme, seo, sectionOrder) VALUES (?, ?, ?, ?)`,
+        `INSERT INTO settings (id, theme, seo, sectionOrder, sectionVisibility) VALUES (?, ?, ?, ?, ?)`,
         [
           backup.settings.id || 1,
           JSON.stringify(backup.settings.theme || {}),
           JSON.stringify(backup.settings.seo || {}),
-          JSON.stringify(backup.settings.sectionOrder || [])
+          JSON.stringify(backup.settings.sectionOrder || []),
+          JSON.stringify(backup.settings.sectionVisibility || {})
         ]
       );
     }

@@ -109,6 +109,7 @@ CREATE TABLE IF NOT EXISTS settings (
   theme TEXT,
   seo TEXT,
   sectionOrder TEXT,
+  sectionVisibility TEXT,
   createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -339,7 +340,7 @@ export const runMigration = async () => {
 
         // Seed Settings
         await run(
-          `INSERT INTO settings (theme, seo, sectionOrder) VALUES (?, ?, ?)`,
+          `INSERT INTO settings (theme, seo, sectionOrder, sectionVisibility) VALUES (?, ?, ?, ?)`,
           [
             JSON.stringify({
               primaryColor: '#FFFFFF',
@@ -364,7 +365,20 @@ export const runMigration = async () => {
               'gallery',
               'lifestyle',
               'contact'
-            ])
+            ]),
+            JSON.stringify({
+              hero: true,
+              about: true,
+              education: true,
+              experience: true,
+              skills: true,
+              projects: true,
+              certifications: true,
+              family: true,
+              hobbies: true,
+              gallery: true,
+              contact: true
+            })
           ]
         );
 
