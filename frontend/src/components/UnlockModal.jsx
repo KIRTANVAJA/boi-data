@@ -36,7 +36,7 @@ const UnlockModal = ({ isOpen, onClose }) => {
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
     if (lockoutTime > 0) {
@@ -49,7 +49,7 @@ const UnlockModal = ({ isOpen, onClose }) => {
       return;
     }
 
-    const success = login(accessKey);
+    const success = await login(accessKey);
 
     if (success) {
       toast.success('Access granted! Entering dashboard...');

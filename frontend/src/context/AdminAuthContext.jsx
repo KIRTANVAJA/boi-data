@@ -1,30 +1,28 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext } from 'react';
+import { useAuth } from './AuthContext.jsx';
 
 const AdminAuthContext = createContext();
 
-const ADMIN_PASSWORD = "adminpassword123"; // Default gate password
-
 export const AdminAuthProvider = ({ children }) => {
-  const [isAuthenticated, setIsAuthenticated] = useState(() => {
-    return localStorage.getItem('admin_logged_in') === 'true';
-  });
+  const { user, login: apiLogin, logout: apiLogout, loading } = useAuth();
 
-  const login = (password) => {
-    if (password === ADMIN_PASSWORD) {
-      setIsAuthenticated(true);
-      localStorage.setItem('admin_logged_in', 'true');
-      return true;
+  const isAuthenticated = !!user;
+
+  const login = async (password) => {
+    try {
+      const res = await apiLogin('admin', password);
+      return !!res;
+    } catch (err) {
+      return false;
     }
-    return false;
   };
 
   const logout = () => {
-    setIsAuthenticated(false);
-    localStorage.removeItem('admin_logged_in');
+    apiLogout();
   };
 
   return (
-    <AdminAuthContext.Provider value={{ isAuthenticated, login, logout }}>
+    <AdminAuthContext.Provider value={{ isAuthenticated, login, logout, loading }}>
       {children}
     </AdminAuthContext.Provider>
   );

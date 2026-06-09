@@ -1,5 +1,5 @@
 import jwt from 'jsonwebtoken';
-import User from '../models/User.js';
+import { queryOne } from '../config/sqliteDb.js';
 
 export const protect = async (req, res, next) => {
   let token;
@@ -9,7 +9,7 @@ export const protect = async (req, res, next) => {
       token = req.headers.authorization.split(' ')[1];
       const decoded = jwt.verify(token, process.env.JWT_SECRET || 'supersecurejwtsecretkey_gold_accent_theme_2026');
 
-      req.user = await User.findById(decoded.id).select('-password');
+      req.user = await queryOne('SELECT id, username, email FROM users WHERE id = ?', [decoded.id]);
       if (!req.user) {
         return res.status(401).json({ success: false, error: 'User not found' });
       }

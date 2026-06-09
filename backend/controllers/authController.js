@@ -1,5 +1,6 @@
 import jwt from 'jsonwebtoken';
-import User from '../models/User.js';
+import bcrypt from 'bcryptjs';
+import { queryOne, run } from '../config/sqliteDb.js';
 import { logActivity } from '../middleware/activityLogger.js';
 
 // Generate JWT token helper
@@ -20,22 +21,22 @@ export const login = async (req, res, next) => {
       return res.status(400).json({ success: false, error: 'Please provide username and password' });
     }
 
-    // Check for user
-    const user = await User.findOne({ username }).select('+password');
+    // Check for user in SQLite
+    const user = await queryOne('SELECT * FROM users WHERE username = ?', [username]);
     if (!user) {
       await logActivity('System', 'LOGIN_FAIL', `Attempted login with username: ${username}`, req);
       return res.status(401).json({ success: false, error: 'Invalid credentials' });
     }
 
     // Check password matches
-    const isMatch = await user.matchPassword(password);
+    const isMatch = await bcrypt.compare(password, user.password_hash);
     if (!isMatch) {
       await logActivity(username, 'LOGIN_FAIL', `Incorrect password attempt`, req);
       return res.status(401).json({ success: false, error: 'Invalid credentials' });
     }
 
     // Token response
-    const token = generateToken(user._id);
+    const token = generateToken(user.id);
 
     await logActivity(username, 'LOGIN_SUCCESS', `Logged in successfully`, req);
 
@@ -43,7 +44,7 @@ export const login = async (req, res, next) => {
       success: true,
       token,
       user: {
-        id: user._id,
+        id: user.id,
         username: user.username,
         email: user.email,
       },
@@ -58,7 +59,7 @@ export const login = async (req, res, next) => {
 // @access  Private
 export const getMe = async (req, res, next) => {
   try {
-    const user = await User.findById(req.user.id);
+    const user = await queryOne('SELECT id, username, email FROM users WHERE id = ?', [req.user.id]);
     res.status(200).json({
       success: true,
       user,
@@ -79,15 +80,17 @@ export const changePassword = async (req, res, next) => {
       return res.status(400).json({ success: false, error: 'Please enter current and new password' });
     }
 
-    const user = await User.findById(req.user.id).select('+password');
-    const isMatch = await user.matchPassword(currentPassword);
+    const user = await queryOne('SELECT * FROM users WHERE id = ?', [req.user.id]);
+    const isMatch = await bcrypt.compare(currentPassword, user.password_hash);
 
     if (!isMatch) {
       return res.status(401).json({ success: false, error: 'Incorrect current password' });
     }
 
-    user.password = newPassword;
-    await user.save();
+    const salt = await bcrypt.genSalt(10);
+    const newPasswordHash = await bcrypt.hash(newPassword, salt);
+
+    await run('UPDATE users SET password_hash = ? WHERE id = ?', [newPasswordHash, req.user.id]);
 
     await logActivity(user.username, 'CHANGE_PASSWORD', `Changed login password`, req);
 

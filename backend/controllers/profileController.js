@@ -1,22 +1,31 @@
-import Profile from '../models/Profile.js';
-import Family from '../models/Family.js';
-import EducationCareer from '../models/EducationCareer.js';
-import Lifestyle from '../models/Lifestyle.js';
-import Settings from '../models/Settings.js';
-import Project from '../models/Project.js';
-import Achievement from '../models/Achievement.js';
-import Gallery from '../models/Gallery.js';
+import { queryOne, run, query } from '../config/sqliteDb.js';
 import { handleFileUpload } from '../middleware/upload.js';
 import { logActivity } from '../middleware/activityLogger.js';
+
+// Helper to safely parse JSON or return default
+const safeParse = (str, def = {}) => {
+  try {
+    return str ? JSON.parse(str) : def;
+  } catch (e) {
+    return def;
+  }
+};
 
 // --- PROFILE ACTIONS ---
 
 export const getProfile = async (req, res, next) => {
   try {
-    let profile = await Profile.findOne();
+    let profile = await queryOne('SELECT * FROM profile LIMIT 1');
     if (!profile) {
-      profile = await Profile.create({ fullName: 'New User' });
+      const result = await run('INSERT INTO profile (fullName) VALUES (?)', ['New User']);
+      profile = await queryOne('SELECT * FROM profile WHERE id = ?', [result.id]);
     }
+    
+    // Parse JSON fields
+    profile.socialLinks = safeParse(profile.socialLinks);
+    profile.contactInfo = safeParse(profile.contactInfo);
+    profile._id = profile.id;
+
     res.status(200).json({ success: true, data: profile });
   } catch (error) {
     next(error);
@@ -25,26 +34,59 @@ export const getProfile = async (req, res, next) => {
 
 export const updateProfile = async (req, res, next) => {
   try {
-    let profile = await Profile.findOne();
-    const updateData = { ...req.body };
+    let profile = await queryOne('SELECT * FROM profile LIMIT 1');
+    if (!profile) {
+      const result = await run('INSERT INTO profile (fullName) VALUES (?)', ['New User']);
+      profile = await queryOne('SELECT * FROM profile WHERE id = ?', [result.id]);
+    }
+
+    const merged = {
+      fullName: req.body.fullName !== undefined ? req.body.fullName : profile.fullName,
+      nickname: req.body.nickname !== undefined ? req.body.nickname : profile.nickname,
+      professionalTitle: req.body.professionalTitle !== undefined ? req.body.professionalTitle : profile.professionalTitle,
+      shortIntro: req.body.shortIntro !== undefined ? req.body.shortIntro : profile.shortIntro,
+      statusBadge: req.body.statusBadge !== undefined ? req.body.statusBadge : profile.statusBadge,
+      profileImage: profile.profileImage,
+      age: req.body.age !== undefined ? parseInt(req.body.age) : profile.age,
+      dob: req.body.dob !== undefined ? req.body.dob : profile.dob,
+      gender: req.body.gender !== undefined ? req.body.gender : profile.gender,
+      height: req.body.height !== undefined ? req.body.height : profile.height,
+      weight: req.body.weight !== undefined ? req.body.weight : profile.weight,
+      bloodGroup: req.body.bloodGroup !== undefined ? req.body.bloodGroup : profile.bloodGroup,
+      maritalStatus: req.body.maritalStatus !== undefined ? req.body.maritalStatus : profile.maritalStatus,
+      motherTongue: req.body.motherTongue !== undefined ? req.body.motherTongue : profile.motherTongue,
+      religion: req.body.religion !== undefined ? req.body.religion : profile.religion,
+      location: req.body.location !== undefined ? req.body.location : profile.location,
+      socialLinks: req.body.socialLinks !== undefined ? (typeof req.body.socialLinks === 'string' ? req.body.socialLinks : JSON.stringify(req.body.socialLinks)) : profile.socialLinks,
+      contactInfo: req.body.contactInfo !== undefined ? (typeof req.body.contactInfo === 'string' ? req.body.contactInfo : JSON.stringify(req.body.contactInfo)) : profile.contactInfo
+    };
 
     if (req.file) {
-      const imageUrl = await handleFileUpload(req.file);
-      updateData.profileImage = imageUrl;
+      merged.profileImage = await handleFileUpload(req.file);
     }
 
-    if (!profile) {
-      profile = await Profile.create(updateData);
-    } else {
-      profile = await Profile.findByIdAndUpdate(profile._id, updateData, {
-        new: true,
-        runValidators: true,
-      });
-    }
+    await run(
+      `UPDATE profile SET 
+        fullName = ?, nickname = ?, professionalTitle = ?, shortIntro = ?, statusBadge = ?, profileImage = ?,
+        age = ?, dob = ?, gender = ?, height = ?, weight = ?, bloodGroup = ?, maritalStatus = ?, motherTongue = ?,
+        religion = ?, location = ?, socialLinks = ?, contactInfo = ?
+       WHERE id = ?`,
+      [
+        merged.fullName, merged.nickname, merged.professionalTitle, merged.shortIntro, merged.statusBadge, merged.profileImage,
+        merged.age, merged.dob, merged.gender, merged.height, merged.weight, merged.bloodGroup, merged.maritalStatus, merged.motherTongue,
+        merged.religion, merged.location, merged.socialLinks, merged.contactInfo,
+        profile.id
+      ]
+    );
+
+    const updatedProfile = await queryOne('SELECT * FROM profile WHERE id = ?', [profile.id]);
+    updatedProfile.socialLinks = safeParse(updatedProfile.socialLinks);
+    updatedProfile.contactInfo = safeParse(updatedProfile.contactInfo);
+    updatedProfile._id = updatedProfile.id;
 
     await logActivity(req.user?.username || 'System', 'UPDATE_PROFILE', 'Updated profile & personal info details', req);
 
-    res.status(200).json({ success: true, data: profile });
+    res.status(200).json({ success: true, data: updatedProfile });
   } catch (error) {
     next(error);
   }
@@ -54,10 +96,18 @@ export const updateProfile = async (req, res, next) => {
 
 export const getFamily = async (req, res, next) => {
   try {
-    let family = await Family.findOne();
+    let family = await queryOne('SELECT * FROM family LIMIT 1');
     if (!family) {
-      family = await Family.create({});
+      const result = await run('INSERT INTO family (familyType) VALUES (?)', ['Nuclear']);
+      family = await queryOne('SELECT * FROM family WHERE id = ?', [result.id]);
     }
+
+    family.fatherDetails = safeParse(family.fatherDetails);
+    family.motherDetails = safeParse(family.motherDetails);
+    family.brothers = safeParse(family.brothers, []);
+    family.sisters = safeParse(family.sisters, []);
+    family._id = family.id;
+
     res.status(200).json({ success: true, data: family });
   } catch (error) {
     next(error);
@@ -66,19 +116,34 @@ export const getFamily = async (req, res, next) => {
 
 export const updateFamily = async (req, res, next) => {
   try {
-    let family = await Family.findOne();
+    let family = await queryOne('SELECT * FROM family LIMIT 1');
     if (!family) {
-      family = await Family.create(req.body);
-    } else {
-      family = await Family.findByIdAndUpdate(family._id, req.body, {
-        new: true,
-        runValidators: true,
-      });
+      const result = await run('INSERT INTO family (familyType) VALUES (?)', ['Nuclear']);
+      family = await queryOne('SELECT * FROM family WHERE id = ?', [result.id]);
     }
+
+    const fatherDetails = req.body.fatherDetails !== undefined ? JSON.stringify(req.body.fatherDetails) : family.fatherDetails;
+    const motherDetails = req.body.motherDetails !== undefined ? JSON.stringify(req.body.motherDetails) : family.motherDetails;
+    const brothers = req.body.brothers !== undefined ? JSON.stringify(req.body.brothers) : family.brothers;
+    const sisters = req.body.sisters !== undefined ? JSON.stringify(req.body.sisters) : family.sisters;
+    const familyType = req.body.familyType !== undefined ? req.body.familyType : family.familyType;
+    const familyBackground = req.body.familyBackground !== undefined ? req.body.familyBackground : family.familyBackground;
+
+    await run(
+      `UPDATE family SET fatherDetails = ?, motherDetails = ?, brothers = ?, sisters = ?, familyType = ?, familyBackground = ? WHERE id = ?`,
+      [fatherDetails, motherDetails, brothers, sisters, familyType, familyBackground, family.id]
+    );
+
+    const updatedFamily = await queryOne('SELECT * FROM family WHERE id = ?', [family.id]);
+    updatedFamily.fatherDetails = safeParse(updatedFamily.fatherDetails);
+    updatedFamily.motherDetails = safeParse(updatedFamily.motherDetails);
+    updatedFamily.brothers = safeParse(updatedFamily.brothers, []);
+    updatedFamily.sisters = safeParse(updatedFamily.sisters, []);
+    updatedFamily._id = updatedFamily.id;
 
     await logActivity(req.user?.username || 'System', 'UPDATE_FAMILY', 'Updated family profile details', req);
 
-    res.status(200).json({ success: true, data: family });
+    res.status(200).json({ success: true, data: updatedFamily });
   } catch (error) {
     next(error);
   }
@@ -88,10 +153,22 @@ export const updateFamily = async (req, res, next) => {
 
 export const getEducationCareer = async (req, res, next) => {
   try {
-    let edCar = await EducationCareer.findOne();
+    let edCar = await queryOne('SELECT * FROM education_career LIMIT 1');
     if (!edCar) {
-      edCar = await EducationCareer.create({ education: [], experience: [], skills: [], certifications: [], futureGoals: [] });
+      const result = await run(
+        'INSERT INTO education_career (education, experience, skills, certifications, futureGoals) VALUES (?, ?, ?, ?, ?)',
+        ['[]', '[]', '[]', '[]', '[]']
+      );
+      edCar = await queryOne('SELECT * FROM education_career WHERE id = ?', [result.id]);
     }
+
+    edCar.education = safeParse(edCar.education, []);
+    edCar.experience = safeParse(edCar.experience, []);
+    edCar.skills = safeParse(edCar.skills, []);
+    edCar.certifications = safeParse(edCar.certifications, []);
+    edCar.futureGoals = safeParse(edCar.futureGoals, []);
+    edCar._id = edCar.id;
+
     res.status(200).json({ success: true, data: edCar });
   } catch (error) {
     next(error);
@@ -100,19 +177,37 @@ export const getEducationCareer = async (req, res, next) => {
 
 export const updateEducationCareer = async (req, res, next) => {
   try {
-    let edCar = await EducationCareer.findOne();
+    let edCar = await queryOne('SELECT * FROM education_career LIMIT 1');
     if (!edCar) {
-      edCar = await EducationCareer.create(req.body);
-    } else {
-      edCar = await EducationCareer.findByIdAndUpdate(edCar._id, req.body, {
-        new: true,
-        runValidators: true,
-      });
+      const result = await run(
+        'INSERT INTO education_career (education, experience, skills, certifications, futureGoals) VALUES (?, ?, ?, ?, ?)',
+        ['[]', '[]', '[]', '[]', '[]']
+      );
+      edCar = await queryOne('SELECT * FROM education_career WHERE id = ?', [result.id]);
     }
+
+    const education = req.body.education !== undefined ? JSON.stringify(req.body.education) : edCar.education;
+    const experience = req.body.experience !== undefined ? JSON.stringify(req.body.experience) : edCar.experience;
+    const skills = req.body.skills !== undefined ? JSON.stringify(req.body.skills) : edCar.skills;
+    const certifications = req.body.certifications !== undefined ? JSON.stringify(req.body.certifications) : edCar.certifications;
+    const futureGoals = req.body.futureGoals !== undefined ? JSON.stringify(req.body.futureGoals) : edCar.futureGoals;
+
+    await run(
+      `UPDATE education_career SET education = ?, experience = ?, skills = ?, certifications = ?, futureGoals = ? WHERE id = ?`,
+      [education, experience, skills, certifications, futureGoals, edCar.id]
+    );
+
+    const updatedEdCar = await queryOne('SELECT * FROM education_career WHERE id = ?', [edCar.id]);
+    updatedEdCar.education = safeParse(updatedEdCar.education, []);
+    updatedEdCar.experience = safeParse(updatedEdCar.experience, []);
+    updatedEdCar.skills = safeParse(updatedEdCar.skills, []);
+    updatedEdCar.certifications = safeParse(updatedEdCar.certifications, []);
+    updatedEdCar.futureGoals = safeParse(updatedEdCar.futureGoals, []);
+    updatedEdCar._id = updatedEdCar.id;
 
     await logActivity(req.user?.username || 'System', 'UPDATE_EDUCATION_CAREER', 'Updated education/career timeline details', req);
 
-    res.status(200).json({ success: true, data: edCar });
+    res.status(200).json({ success: true, data: updatedEdCar });
   } catch (error) {
     next(error);
   }
@@ -122,10 +217,21 @@ export const updateEducationCareer = async (req, res, next) => {
 
 export const getLifestyle = async (req, res, next) => {
   try {
-    let lifestyle = await Lifestyle.findOne();
+    let lifestyle = await queryOne('SELECT * FROM lifestyle LIMIT 1');
     if (!lifestyle) {
-      lifestyle = await Lifestyle.create({ hobbies: [], interests: [], fitness: '', travel: [], languages: [] });
+      const result = await run(
+        'INSERT INTO lifestyle (hobbies, interests, fitness, travel, languages) VALUES (?, ?, ?, ?, ?)',
+        ['[]', '[]', '', '[]', '[]']
+      );
+      lifestyle = await queryOne('SELECT * FROM lifestyle WHERE id = ?', [result.id]);
     }
+
+    lifestyle.hobbies = safeParse(lifestyle.hobbies, []);
+    lifestyle.interests = safeParse(lifestyle.interests, []);
+    lifestyle.travel = safeParse(lifestyle.travel, []);
+    lifestyle.languages = safeParse(lifestyle.languages, []);
+    lifestyle._id = lifestyle.id;
+
     res.status(200).json({ success: true, data: lifestyle });
   } catch (error) {
     next(error);
@@ -134,19 +240,36 @@ export const getLifestyle = async (req, res, next) => {
 
 export const updateLifestyle = async (req, res, next) => {
   try {
-    let lifestyle = await Lifestyle.findOne();
+    let lifestyle = await queryOne('SELECT * FROM lifestyle LIMIT 1');
     if (!lifestyle) {
-      lifestyle = await Lifestyle.create(req.body);
-    } else {
-      lifestyle = await Lifestyle.findByIdAndUpdate(lifestyle._id, req.body, {
-        new: true,
-        runValidators: true,
-      });
+      const result = await run(
+        'INSERT INTO lifestyle (hobbies, interests, fitness, travel, languages) VALUES (?, ?, ?, ?, ?)',
+        ['[]', '[]', '', '[]', '[]']
+      );
+      lifestyle = await queryOne('SELECT * FROM lifestyle WHERE id = ?', [result.id]);
     }
+
+    const hobbies = req.body.hobbies !== undefined ? JSON.stringify(req.body.hobbies) : lifestyle.hobbies;
+    const interests = req.body.interests !== undefined ? JSON.stringify(req.body.interests) : lifestyle.interests;
+    const fitness = req.body.fitness !== undefined ? req.body.fitness : lifestyle.fitness;
+    const travel = req.body.travel !== undefined ? JSON.stringify(req.body.travel) : lifestyle.travel;
+    const languages = req.body.languages !== undefined ? JSON.stringify(req.body.languages) : lifestyle.languages;
+
+    await run(
+      `UPDATE lifestyle SET hobbies = ?, interests = ?, fitness = ?, travel = ?, languages = ? WHERE id = ?`,
+      [hobbies, interests, fitness, travel, languages, lifestyle.id]
+    );
+
+    const updatedLifestyle = await queryOne('SELECT * FROM lifestyle WHERE id = ?', [lifestyle.id]);
+    updatedLifestyle.hobbies = safeParse(updatedLifestyle.hobbies, []);
+    updatedLifestyle.interests = safeParse(updatedLifestyle.interests, []);
+    updatedLifestyle.travel = safeParse(updatedLifestyle.travel, []);
+    updatedLifestyle.languages = safeParse(updatedLifestyle.languages, []);
+    updatedLifestyle._id = updatedLifestyle.id;
 
     await logActivity(req.user?.username || 'System', 'UPDATE_LIFESTYLE', 'Updated lifestyle hobbies & interest options', req);
 
-    res.status(200).json({ success: true, data: lifestyle });
+    res.status(200).json({ success: true, data: updatedLifestyle });
   } catch (error) {
     next(error);
   }
@@ -156,10 +279,24 @@ export const updateLifestyle = async (req, res, next) => {
 
 export const getSettings = async (req, res, next) => {
   try {
-    let settings = await Settings.findOne();
+    let settings = await queryOne('SELECT * FROM settings LIMIT 1');
     if (!settings) {
-      settings = await Settings.create({});
+      const result = await run(
+        'INSERT INTO settings (theme, seo, sectionOrder) VALUES (?, ?, ?)',
+        [
+          JSON.stringify({ primaryColor: '#000000', accentColor: '#D4AF37', isDarkMode: true, fontFamily: 'Inter' }),
+          JSON.stringify({ metaTitle: 'My Digital Biodata', metaDescription: 'Digital CV', keywords: 'biodata', ogImage: '' }),
+          JSON.stringify(['hero', 'personal', 'family', 'education', 'career', 'projects', 'achievements', 'gallery', 'lifestyle', 'contact'])
+        ]
+      );
+      settings = await queryOne('SELECT * FROM settings WHERE id = ?', [result.id]);
     }
+
+    settings.theme = safeParse(settings.theme);
+    settings.seo = safeParse(settings.seo);
+    settings.sectionOrder = safeParse(settings.sectionOrder, []);
+    settings._id = settings.id;
+
     res.status(200).json({ success: true, data: settings });
   } catch (error) {
     next(error);
@@ -168,19 +305,37 @@ export const getSettings = async (req, res, next) => {
 
 export const updateSettings = async (req, res, next) => {
   try {
-    let settings = await Settings.findOne();
+    let settings = await queryOne('SELECT * FROM settings LIMIT 1');
     if (!settings) {
-      settings = await Settings.create(req.body);
-    } else {
-      settings = await Settings.findByIdAndUpdate(settings._id, req.body, {
-        new: true,
-        runValidators: true,
-      });
+      const result = await run(
+        'INSERT INTO settings (theme, seo, sectionOrder) VALUES (?, ?, ?)',
+        [
+          JSON.stringify({ primaryColor: '#000000', accentColor: '#D4AF37', isDarkMode: true, fontFamily: 'Inter' }),
+          JSON.stringify({ metaTitle: 'My Digital Biodata', metaDescription: 'Digital CV', keywords: 'biodata', ogImage: '' }),
+          JSON.stringify(['hero', 'personal', 'family', 'education', 'career', 'projects', 'achievements', 'gallery', 'lifestyle', 'contact'])
+        ]
+      );
+      settings = await queryOne('SELECT * FROM settings WHERE id = ?', [result.id]);
     }
+
+    const theme = req.body.theme !== undefined ? JSON.stringify(req.body.theme) : settings.theme;
+    const seo = req.body.seo !== undefined ? JSON.stringify(req.body.seo) : settings.seo;
+    const sectionOrder = req.body.sectionOrder !== undefined ? JSON.stringify(req.body.sectionOrder) : settings.sectionOrder;
+
+    await run(
+      `UPDATE settings SET theme = ?, seo = ?, sectionOrder = ? WHERE id = ?`,
+      [theme, seo, sectionOrder, settings.id]
+    );
+
+    const updatedSettings = await queryOne('SELECT * FROM settings WHERE id = ?', [settings.id]);
+    updatedSettings.theme = safeParse(updatedSettings.theme);
+    updatedSettings.seo = safeParse(updatedSettings.seo);
+    updatedSettings.sectionOrder = safeParse(updatedSettings.sectionOrder, []);
+    updatedSettings._id = updatedSettings.id;
 
     await logActivity(req.user?.username || 'System', 'UPDATE_SETTINGS', 'Updated system layout theme & SEO keywords', req);
 
-    res.status(200).json({ success: true, data: settings });
+    res.status(200).json({ success: true, data: updatedSettings });
   } catch (error) {
     next(error);
   }
@@ -190,15 +345,63 @@ export const updateSettings = async (req, res, next) => {
 
 export const exportBackup = async (req, res, next) => {
   try {
+    // Export structure from tables
+    const profile = await queryOne('SELECT * FROM profile LIMIT 1');
+    if (profile) {
+      profile.socialLinks = safeParse(profile.socialLinks);
+      profile.contactInfo = safeParse(profile.contactInfo);
+      profile._id = profile.id;
+    }
+
+    const family = await queryOne('SELECT * FROM family LIMIT 1');
+    if (family) {
+      family.fatherDetails = safeParse(family.fatherDetails);
+      family.motherDetails = safeParse(family.motherDetails);
+      family.brothers = safeParse(family.brothers, []);
+      family.sisters = safeParse(family.sisters, []);
+      family._id = family.id;
+    }
+
+    const educationCareer = await queryOne('SELECT * FROM education_career LIMIT 1');
+    if (educationCareer) {
+      educationCareer.education = safeParse(educationCareer.education, []);
+      educationCareer.experience = safeParse(educationCareer.experience, []);
+      educationCareer.skills = safeParse(educationCareer.skills, []);
+      educationCareer.certifications = safeParse(educationCareer.certifications, []);
+      educationCareer.futureGoals = safeParse(educationCareer.futureGoals, []);
+      educationCareer._id = educationCareer.id;
+    }
+
+    const lifestyle = await queryOne('SELECT * FROM lifestyle LIMIT 1');
+    if (lifestyle) {
+      lifestyle.hobbies = safeParse(lifestyle.hobbies, []);
+      lifestyle.interests = safeParse(lifestyle.interests, []);
+      lifestyle.travel = safeParse(lifestyle.travel, []);
+      lifestyle.languages = safeParse(lifestyle.languages, []);
+      lifestyle._id = lifestyle.id;
+    }
+
+    const settings = await queryOne('SELECT * FROM settings LIMIT 1');
+    if (settings) {
+      settings.theme = safeParse(settings.theme);
+      settings.seo = safeParse(settings.seo);
+      settings.sectionOrder = safeParse(settings.sectionOrder, []);
+      settings._id = settings.id;
+    }
+
+    const projects = (await query('SELECT * FROM projects ORDER BY item_order ASC')).map(p => ({ ...p, _id: p.id }));
+    const achievements = (await query('SELECT * FROM achievements ORDER BY date DESC')).map(a => ({ ...a, _id: a.id }));
+    const gallery = (await query('SELECT * FROM gallery ORDER BY item_order ASC')).map(g => ({ ...g, _id: g.id }));
+
     const backupData = {
-      profile: await Profile.findOne(),
-      family: await Family.findOne(),
-      educationCareer: await EducationCareer.findOne(),
-      lifestyle: await Lifestyle.findOne(),
-      settings: await Settings.findOne(),
-      projects: await Project.find().sort({ order: 1 }),
-      achievements: await Achievement.find().sort({ date: -1 }),
-      gallery: await Gallery.find().sort({ createdAt: -1 }),
+      profile,
+      family,
+      educationCareer,
+      lifestyle,
+      settings,
+      projects,
+      achievements,
+      gallery
     };
 
     res.status(200).json({
@@ -218,43 +421,138 @@ export const importBackup = async (req, res, next) => {
       return res.status(400).json({ success: false, error: 'No backup payload supplied' });
     }
 
-    // Restore components
+    // Restore Profile
     if (backup.profile) {
-      await Profile.deleteMany({});
-      await Profile.create(backup.profile);
+      await run('DELETE FROM profile');
+      await run(
+        `INSERT INTO profile (
+          id, fullName, nickname, professionalTitle, shortIntro, statusBadge, profileImage,
+          age, dob, gender, height, weight, bloodGroup, maritalStatus, motherTongue,
+          religion, location, socialLinks, contactInfo
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          backup.profile.id || 1,
+          backup.profile.fullName,
+          backup.profile.nickname,
+          backup.profile.professionalTitle,
+          backup.profile.shortIntro,
+          backup.profile.statusBadge,
+          backup.profile.profileImage,
+          backup.profile.age,
+          backup.profile.dob,
+          backup.profile.gender,
+          backup.profile.height,
+          backup.profile.weight,
+          backup.profile.bloodGroup,
+          backup.profile.maritalStatus,
+          backup.profile.motherTongue,
+          backup.profile.religion,
+          backup.profile.location,
+          JSON.stringify(backup.profile.socialLinks || {}),
+          JSON.stringify(backup.profile.contactInfo || {})
+        ]
+      );
     }
+
+    // Restore Family
     if (backup.family) {
-      await Family.deleteMany({});
-      await Family.create(backup.family);
+      await run('DELETE FROM family');
+      await run(
+        `INSERT INTO family (id, fatherDetails, motherDetails, brothers, sisters, familyType, familyBackground)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [
+          backup.family.id || 1,
+          JSON.stringify(backup.family.fatherDetails || {}),
+          JSON.stringify(backup.family.motherDetails || {}),
+          JSON.stringify(backup.family.brothers || []),
+          JSON.stringify(backup.family.sisters || []),
+          backup.family.familyType,
+          backup.family.familyBackground
+        ]
+      );
     }
+
+    // Restore Education & Career
     if (backup.educationCareer) {
-      await EducationCareer.deleteMany({});
-      await EducationCareer.create(backup.educationCareer);
+      await run('DELETE FROM education_career');
+      await run(
+        `INSERT INTO education_career (id, education, experience, skills, certifications, futureGoals)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [
+          backup.educationCareer.id || 1,
+          JSON.stringify(backup.educationCareer.education || []),
+          JSON.stringify(backup.educationCareer.experience || []),
+          JSON.stringify(backup.educationCareer.skills || []),
+          JSON.stringify(backup.educationCareer.certifications || []),
+          JSON.stringify(backup.educationCareer.futureGoals || [])
+        ]
+      );
     }
+
+    // Restore Lifestyle
     if (backup.lifestyle) {
-      await Lifestyle.deleteMany({});
-      await Lifestyle.create(backup.lifestyle);
+      await run('DELETE FROM lifestyle');
+      await run(
+        `INSERT INTO lifestyle (id, hobbies, interests, fitness, travel, languages)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [
+          backup.lifestyle.id || 1,
+          JSON.stringify(backup.lifestyle.hobbies || []),
+          JSON.stringify(backup.lifestyle.interests || []),
+          backup.lifestyle.fitness,
+          JSON.stringify(backup.lifestyle.travel || []),
+          JSON.stringify(backup.lifestyle.languages || [])
+        ]
+      );
     }
+
+    // Restore Settings
     if (backup.settings) {
-      await Settings.deleteMany({});
-      await Settings.create(backup.settings);
+      await run('DELETE FROM settings');
+      await run(
+        `INSERT INTO settings (id, theme, seo, sectionOrder) VALUES (?, ?, ?, ?)`,
+        [
+          backup.settings.id || 1,
+          JSON.stringify(backup.settings.theme || {}),
+          JSON.stringify(backup.settings.seo || {}),
+          JSON.stringify(backup.settings.sectionOrder || [])
+        ]
+      );
     }
+
+    // Restore Projects
     if (backup.projects && Array.isArray(backup.projects)) {
-      await Project.deleteMany({});
-      if (backup.projects.length > 0) {
-        await Project.insertMany(backup.projects);
+      await run('DELETE FROM projects');
+      for (const p of backup.projects) {
+        await run(
+          `INSERT INTO projects (id, title, description, image, tags, githubLink, demoLink, item_order)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [p.id || p._id, p.title, p.description, p.image, typeof p.tags === 'string' ? p.tags : JSON.stringify(p.tags || []), p.githubLink, p.demoLink, p.item_order]
+        );
       }
     }
+
+    // Restore Achievements
     if (backup.achievements && Array.isArray(backup.achievements)) {
-      await Achievement.deleteMany({});
-      if (backup.achievements.length > 0) {
-        await Achievement.insertMany(backup.achievements);
+      await run('DELETE FROM achievements');
+      for (const a of backup.achievements) {
+        await run(
+          `INSERT INTO achievements (id, title, description, category, date, documentUrl)
+           VALUES (?, ?, ?, ?, ?, ?)`,
+          [a.id || a._id, a.title, a.description, a.category, a.date, a.documentUrl]
+        );
       }
     }
+
+    // Restore Gallery
     if (backup.gallery && Array.isArray(backup.gallery)) {
-      await Gallery.deleteMany({});
-      if (backup.gallery.length > 0) {
-        await Gallery.insertMany(backup.gallery);
+      await run('DELETE FROM gallery');
+      for (const g of backup.gallery) {
+        await run(
+          `INSERT INTO gallery (id, title, mediaUrl, mediaType, albumName, item_order)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          [g.id || g._id, g.title, g.mediaUrl, g.mediaType, g.albumName, g.item_order]
+        );
       }
     }
 

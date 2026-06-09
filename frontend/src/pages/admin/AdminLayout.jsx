@@ -11,10 +11,21 @@ import {
 
 const AdminLayout = () => {
   const { logout } = useAdminAuth();
-  const { portfolioData, visibilitySettings } = usePortfolioData();
+  const { portfolioData, visibilitySettings, loading } = usePortfolioData();
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  if (loading || !portfolioData) {
+    return (
+      <div className="d-flex flex-column justify-content-center align-items-center vh-100 bg-black text-warning">
+        <div className="spinner-border mb-3" role="status" style={{ width: '3rem', height: '3rem' }}>
+          <span className="visually-hidden">Loading...</span>
+        </div>
+        <h5 className="text-gold-gradient fw-bold">Synchronizing Portfolio Database...</h5>
+      </div>
+    );
+  }
 
   const menuItems = [
     { label: 'Overview Dashboard', path: '/admin', icon: <FaThLarge /> },

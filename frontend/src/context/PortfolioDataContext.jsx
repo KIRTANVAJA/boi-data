@@ -1,85 +1,272 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { defaultData } from '../data/defaultData.js';
+import { apiRequest } from '../utils/api.js';
 
 const PortfolioDataContext = createContext();
 
 export const PortfolioDataProvider = ({ children }) => {
-  const [portfolioData, setPortfolioData] = useState(() => {
-    const localDb = localStorage.getItem('biodata_portfolio_db');
-    if (localDb) {
-      try {
-        const parsed = JSON.parse(localDb);
-        if (parsed && typeof parsed === 'object') {
-          return parsed;
-        }
-      } catch (e) {
-        console.error('Failed to parse local storage database', e);
-      }
-    }
-    return defaultData;
-  });
+  const [portfolioData, setPortfolioData] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  // Sync to local storage whenever state updates
+  const loadData = async () => {
+    try {
+      const [profileRes, familyRes, edCarRes, lifestyleRes, projectsRes, achievementsRes, galleryRes] = await Promise.all([
+        apiRequest('/profile'),
+        apiRequest('/profile/family'),
+        apiRequest('/profile/education-career'),
+        apiRequest('/profile/lifestyle'),
+        apiRequest('/portfolio/projects'),
+        apiRequest('/portfolio/achievements'),
+        apiRequest('/portfolio/gallery'),
+      ]);
+
+      const profile = profileRes.data || {};
+      const family = familyRes.data || {};
+      const edCar = edCarRes.data || {};
+      const lifestyle = lifestyleRes.data || {};
+      const projects = projectsRes.data || [];
+      const achievements = achievementsRes.data || [];
+      const gallery = galleryRes.data || [];
+
+      setPortfolioData({
+        personal: {
+          fullName: profile.fullName || '',
+          nickname: profile.nickname || '',
+          professionalTitle: profile.professionalTitle || '',
+          shortIntro: profile.shortIntro || '',
+          statusBadge: profile.statusBadge || '',
+          avatarImage: profile.profileImage || '',
+          age: profile.age || '',
+          dob: profile.dob || '',
+          gender: profile.gender || '',
+          height: profile.height || '',
+          weight: profile.weight || '',
+          bloodGroup: profile.bloodGroup || '',
+          maritalStatus: profile.maritalStatus || '',
+          motherTongue: profile.motherTongue || '',
+          religion: profile.religion || '',
+          location: profile.location || '',
+          socialLinks: profile.socialLinks || {},
+          contactInfo: profile.contactInfo || {}
+        },
+        about: {
+          biography: profile.shortIntro || '',
+          careerGoals: edCar.futureGoals || []
+        },
+        education: edCar.education || [],
+        experience: edCar.experience || [],
+        skills: edCar.skills || [],
+        projects: projects,
+        certifications: achievements, // SQLite achievements map to frontend certifications
+        family: family,
+        lifestyle: {
+          hobbies: lifestyle.hobbies || [],
+          languages: lifestyle.languages || [],
+          interests: lifestyle.interests || []
+        },
+        gallery: gallery,
+        contact: profile.contactInfo || {}
+      });
+    } catch (err) {
+      console.error('Failed to load portfolio context:', err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    localStorage.setItem('biodata_portfolio_db', JSON.stringify(portfolioData));
-  }, [portfolioData]);
+    loadData();
+  }, []);
 
   // Update object section (e.g. personal, about, contact)
-  const updateSection = (sectionKey, updatedContent) => {
-    setPortfolioData((prev) => ({
-      ...prev,
-      [sectionKey]: {
-        ...prev[sectionKey],
-        ...updatedContent
+  const updateSection = async (sectionKey, updatedContent) => {
+    try {
+      if (sectionKey === 'personal' || sectionKey === 'contact') {
+        const body = sectionKey === 'personal' ? updatedContent : { contactInfo: updatedContent };
+        const res = await apiRequest('/profile', {
+          method: 'PUT',
+          body
+        });
+        if (res.success) {
+          await loadData();
+          return true;
+        }
+      } else if (sectionKey === 'about') {
+        const bodyProfile = { shortIntro: updatedContent.biography };
+        const bodyEdCar = { futureGoals: updatedContent.careerGoals };
+        await Promise.all([
+          apiRequest('/profile', { method: 'PUT', body: bodyProfile }),
+          apiRequest('/profile/education-career', { method: 'PUT', body: bodyEdCar })
+        ]);
+        await loadData();
+        return true;
+      } else if (sectionKey === 'family') {
+        const res = await apiRequest('/profile/family', {
+          method: 'PUT',
+          body: updatedContent
+        });
+        if (res.success) {
+          await loadData();
+          return true;
+        }
+      } else if (sectionKey === 'lifestyle') {
+        const res = await apiRequest('/profile/lifestyle', {
+          method: 'PUT',
+          body: updatedContent
+        });
+        if (res.success) {
+          await loadData();
+          return true;
+        }
       }
-    }));
+    } catch (e) {
+      console.error('Update section error:', e.message);
+    }
+    return false;
   };
 
   // Add item to a list section (e.g. education, projects)
-  const addItem = (sectionKey, item) => {
-    setPortfolioData((prev) => {
-      const currentList = Array.isArray(prev[sectionKey]) ? prev[sectionKey] : [];
-      return {
-        ...prev,
-        [sectionKey]: [...currentList, item]
-      };
-    });
-  };
-
-  // Update specific index item in a list section
-  const updateItem = (sectionKey, index, updatedItem) => {
-    setPortfolioData((prev) => {
-      const currentList = Array.isArray(prev[sectionKey]) ? [...prev[sectionKey]] : [];
-      if (index >= 0 && index < currentList.length) {
-        currentList[index] = { ...currentList[index], ...updatedItem };
+  const addItem = async (sectionKey, item) => {
+    try {
+      if (sectionKey === 'education' || sectionKey === 'experience' || sectionKey === 'skills') {
+        const currentList = portfolioData[sectionKey] || [];
+        const body = { [sectionKey]: [...currentList, item] };
+        const res = await apiRequest('/profile/education-career', {
+          method: 'PUT',
+          body
+        });
+        if (res.success) {
+          await loadData();
+          return true;
+        }
+      } else if (sectionKey === 'projects') {
+        const res = await apiRequest('/portfolio/projects', {
+          method: 'POST',
+          body: item
+        });
+        if (res.success) {
+          await loadData();
+          return true;
+        }
+      } else if (sectionKey === 'certifications') {
+        const res = await apiRequest('/portfolio/achievements', {
+          method: 'POST',
+          body: item
+        });
+        if (res.success) {
+          await loadData();
+          return true;
+        }
+      } else if (sectionKey === 'gallery') {
+        const res = await apiRequest('/portfolio/gallery', {
+          method: 'POST',
+          body: item
+        });
+        if (res.success) {
+          await loadData();
+          return true;
+        }
       }
-      return {
-        ...prev,
-        [sectionKey]: currentList
-      };
-    });
-  };
-
-  // Delete specific index item in a list section
-  const deleteItem = (sectionKey, index) => {
-    setPortfolioData((prev) => {
-      const currentList = Array.isArray(prev[sectionKey]) ? prev[sectionKey] : [];
-      const updatedList = currentList.filter((_, idx) => idx !== index);
-      return {
-        ...prev,
-        [sectionKey]: updatedList
-      };
-    });
-  };
-
-  // Restores all sections back to seed templates
-  const resetToDefault = () => {
-    if (window.confirm('Are you sure you want to revert all changes back to defaults?')) {
-      setPortfolioData(defaultData);
-      localStorage.setItem('biodata_portfolio_db', JSON.stringify(defaultData));
-      return true;
+    } catch (e) {
+      console.error('Add item error:', e.message);
     }
     return false;
+  };
+
+  // Update specific item in a list section
+  const updateItem = async (sectionKey, index, updatedItem) => {
+    try {
+      if (sectionKey === 'education' || sectionKey === 'experience' || sectionKey === 'skills') {
+        const currentList = [...(portfolioData[sectionKey] || [])];
+        if (index >= 0 && index < currentList.length) {
+          currentList[index] = { ...currentList[index], ...updatedItem };
+          const body = { [sectionKey]: currentList };
+          const res = await apiRequest('/profile/education-career', {
+            method: 'PUT',
+            body
+          });
+          if (res.success) {
+            await loadData();
+            return true;
+          }
+        }
+      } else if (sectionKey === 'projects') {
+        const item = portfolioData.projects[index];
+        const res = await apiRequest(`/portfolio/projects/${item._id || item.id}`, {
+          method: 'PUT',
+          body: updatedItem
+        });
+        if (res.success) {
+          await loadData();
+          return true;
+        }
+      } else if (sectionKey === 'certifications') {
+        const item = portfolioData.certifications[index];
+        const res = await apiRequest(`/portfolio/achievements/${item._id || item.id}`, {
+          method: 'PUT',
+          body: updatedItem
+        });
+        if (res.success) {
+          await loadData();
+          return true;
+        }
+      }
+    } catch (e) {
+      console.error('Update item error:', e.message);
+    }
+    return false;
+  };
+
+  // Delete specific item in a list section
+  const deleteItem = async (sectionKey, index) => {
+    try {
+      if (sectionKey === 'education' || sectionKey === 'experience' || sectionKey === 'skills') {
+        const currentList = portfolioData[sectionKey] || [];
+        const newList = currentList.filter((_, idx) => idx !== index);
+        const body = { [sectionKey]: newList };
+        const res = await apiRequest('/profile/education-career', {
+          method: 'PUT',
+          body
+        });
+        if (res.success) {
+          await loadData();
+          return true;
+        }
+      } else if (sectionKey === 'projects') {
+        const item = portfolioData.projects[index];
+        const res = await apiRequest(`/portfolio/projects/${item._id || item.id}`, {
+          method: 'DELETE'
+        });
+        if (res.success) {
+          await loadData();
+          return true;
+        }
+      } else if (sectionKey === 'certifications') {
+        const item = portfolioData.certifications[index];
+        const res = await apiRequest(`/portfolio/achievements/${item._id || item.id}`, {
+          method: 'DELETE'
+        });
+        if (res.success) {
+          await loadData();
+          return true;
+        }
+      } else if (sectionKey === 'gallery') {
+        const item = portfolioData.gallery[index];
+        const res = await apiRequest(`/portfolio/gallery/${item._id || item.id}`, {
+          method: 'DELETE'
+        });
+        if (res.success) {
+          await loadData();
+          return true;
+        }
+      }
+    } catch (e) {
+      console.error('Delete item error:', e.message);
+    }
+    return false;
+  };
+
+  const resetToDefault = async () => {
+    return true;
   };
 
   const [visibilitySettings, setVisibilitySettings] = useState(() => {
@@ -130,6 +317,7 @@ export const PortfolioDataProvider = ({ children }) => {
   return (
     <PortfolioDataContext.Provider value={{
       portfolioData,
+      loading,
       updateSection,
       addItem,
       updateItem,

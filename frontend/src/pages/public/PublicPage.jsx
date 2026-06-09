@@ -18,13 +18,24 @@ import {
 } from 'react-icons/fa';
 
 const PublicPage = () => {
-  const { portfolioData, visibilitySettings } = usePortfolioData();
+  const { portfolioData, visibilitySettings, loading } = usePortfolioData();
   const navigate = useNavigate();
   const { isAuthenticated } = useAdminAuth();
   const [showScrollBtn, setShowScrollBtn] = useState(false);
   const [lightboxSrc, setLightboxSrc] = useState(null);
   const [activeGalleryTab, setActiveGalleryTab] = useState('All');
   const [showUnlockModal, setShowUnlockModal] = useState(false);
+
+  if (loading || !portfolioData) {
+    return (
+      <div className="d-flex flex-column justify-content-center align-items-center vh-100 bg-black text-warning">
+        <div className="spinner-border mb-3" role="status" style={{ width: '3rem', height: '3rem' }}>
+          <span className="visually-hidden">Loading...</span>
+        </div>
+        <h5 className="text-gold-gradient fw-bold">Compiling Digital Biodata...</h5>
+      </div>
+    );
+  }
 
   const personal = portfolioData?.personal || {};
   const about = portfolioData?.about || {};

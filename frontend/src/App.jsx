@@ -1,6 +1,8 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { ToastContainer } from 'react-toastify';
+import { AuthProvider } from './context/AuthContext.jsx';
+import { SettingsProvider } from './context/SettingsContext.jsx';
 import { PortfolioDataProvider } from './context/PortfolioDataContext.jsx';
 import { AdminAuthProvider } from './context/AdminAuthContext.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
@@ -12,6 +14,7 @@ import './styles/theme.css';
 
 // Pages
 import PublicPage from './pages/public/PublicPage.jsx';
+import Login from './pages/Login.jsx';
 
 // Admin CMS sub-pages
 import AdminLayout from './pages/admin/AdminLayout.jsx';
@@ -31,44 +34,51 @@ import ManageHobbies from './pages/admin/ManageHobbies.jsx';
 
 function App() {
   return (
-    <PortfolioDataProvider>
-      <AdminAuthProvider>
-        <Router>
-          <Routes>
-            {/* 1. Public Single Page view */}
-            <Route path="/" element={<PublicPage />} />
+    <AuthProvider>
+      <SettingsProvider>
+        <PortfolioDataProvider>
+          <AdminAuthProvider>
+            <Router>
+              <Routes>
+                {/* 1. Public Single Page view */}
+                <Route path="/" element={<PublicPage />} />
 
-            {/* 2. Protected Dashboard area */}
-            <Route
-              path="/admin"
-              element={
-                <ProtectedRoute>
-                  <AdminLayout />
-                </ProtectedRoute>
-              }
-            >
-              <Route index element={<Dashboard />} />
-              <Route path="visibility" element={<ManageVisibility />} />
-              <Route path="hero" element={<ManageHero />} />
-              <Route path="about" element={<ManageAbout />} />
-              <Route path="education" element={<ManageEducation />} />
-              <Route path="experience" element={<ManageExperience />} />
-              <Route path="skills" element={<ManageSkills />} />
-              <Route path="projects" element={<ManageProjects />} />
-              <Route path="certifications" element={<ManageCertifications />} />
-              <Route path="family" element={<ManageFamily />} />
-              <Route path="gallery" element={<ManageGallery />} />
-              <Route path="hobbies" element={<ManageHobbies />} />
-              <Route path="contact" element={<ManageContact />} />
-            </Route>
+                {/* 2. Login Page */}
+                <Route path="/login" element={<Login />} />
 
-            {/* Redirections fallback */}
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </Router>
-        <ToastContainer position="bottom-right" theme="dark" />
-      </AdminAuthProvider>
-    </PortfolioDataProvider>
+                {/* 3. Protected Dashboard area */}
+                <Route
+                  path="/admin"
+                  element={
+                    <ProtectedRoute>
+                      <AdminLayout />
+                    </ProtectedRoute>
+                  }
+                >
+                  <Route index element={<Dashboard />} />
+                  <Route path="visibility" element={<ManageVisibility />} />
+                  <Route path="hero" element={<ManageHero />} />
+                  <Route path="about" element={<ManageAbout />} />
+                  <Route path="education" element={<ManageEducation />} />
+                  <Route path="experience" element={<ManageExperience />} />
+                  <Route path="skills" element={<ManageSkills />} />
+                  <Route path="projects" element={<ManageProjects />} />
+                  <Route path="certifications" element={<ManageCertifications />} />
+                  <Route path="family" element={<ManageFamily />} />
+                  <Route path="gallery" element={<ManageGallery />} />
+                  <Route path="hobbies" element={<ManageHobbies />} />
+                  <Route path="contact" element={<ManageContact />} />
+                </Route>
+
+                {/* Redirections fallback */}
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
+            </Router>
+            <ToastContainer position="bottom-right" theme="dark" />
+          </AdminAuthProvider>
+        </PortfolioDataProvider>
+      </SettingsProvider>
+    </AuthProvider>
   );
 }
 

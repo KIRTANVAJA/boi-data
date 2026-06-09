@@ -5,7 +5,7 @@ import morgan from 'morgan';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import connectDB from './config/db.js';
+import { runMigration } from './scripts/migrate.js';
 import { errorHandler } from './middleware/errorHandler.js';
 
 // Route imports
@@ -17,8 +17,13 @@ import requestRoutes from './routes/requestRoutes.js';
 // Load environment variables
 dotenv.config();
 
-// Connect to MongoDB
-connectDB();
+// Connect to SQLite & Run Migrations
+runMigration().then(() => {
+  console.log('SQLite Database initialized and ready.');
+}).catch((err) => {
+  console.error('Database migration failed:', err.message);
+  process.exit(1);
+});
 
 const app = express();
 
