@@ -1,5 +1,4 @@
 import pg from 'pg';
-import sqlite3 from 'sqlite3';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
@@ -40,6 +39,11 @@ if (usePostgres) {
     fs.mkdirSync(dbDir, { recursive: true });
   }
   const dbPath = path.join(dbDir, 'database.sqlite');
+  
+  // Dynamically load sqlite3 so the native compiled binary is bypassed in production
+  const sqlite3Module = await import('sqlite3');
+  const sqlite3 = sqlite3Module.default;
+  
   sqliteDb = new sqlite3.Database(dbPath, (err) => {
     if (err) {
       console.error('Failed to open SQLite database:', err.message);
