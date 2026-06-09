@@ -342,9 +342,9 @@ export const runMigration = async () => {
           `INSERT INTO settings (theme, seo, sectionOrder) VALUES (?, ?, ?)`,
           [
             JSON.stringify({
-              primaryColor: '#000000',
+              primaryColor: '#FFFFFF',
               accentColor: '#D4AF37',
-              isDarkMode: true,
+              isDarkMode: false,
               fontFamily: 'Inter'
             }),
             JSON.stringify({
