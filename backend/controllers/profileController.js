@@ -1,4 +1,4 @@
-import { queryOne, run, query } from '../config/sqliteDb.js';
+import { queryOne, run, query, isPostgres } from '../config/sqliteDb.js';
 import { handleFileUpload } from '../middleware/upload.js';
 import { logActivity } from '../middleware/activityLogger.js';
 
@@ -566,6 +566,13 @@ export const importBackup = async (req, res, next) => {
            VALUES (?, ?, ?, ?, ?, ?, ?)`,
           [g.id || g._id, g.title, g.mediaUrl, g.mediaType, g.albumName, g.item_order]
         );
+      }
+    }
+
+    if (isPostgres()) {
+      const tables = ['profile', 'family', 'education_career', 'lifestyle', 'settings', 'projects', 'achievements', 'gallery'];
+      for (const t of tables) {
+        await query(`SELECT setval(pg_get_serial_sequence('${t}', 'id'), COALESCE(max(id), 1)) FROM ${t}`);
       }
     }
 

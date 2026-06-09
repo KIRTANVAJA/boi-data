@@ -7,6 +7,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { runMigration } from './scripts/migrate.js';
 import { errorHandler } from './middleware/errorHandler.js';
+import { isPostgres } from './config/db.js';
 
 // Route imports
 import authRoutes from './routes/authRoutes.js';
@@ -17,9 +18,9 @@ import requestRoutes from './routes/requestRoutes.js';
 // Load environment variables
 dotenv.config();
 
-// Connect to SQLite & Run Migrations
+// Run database migrations
 runMigration().then(() => {
-  console.log('SQLite Database initialized and ready.');
+  console.log(`${isPostgres() ? 'PostgreSQL' : 'SQLite'} Database initialized and ready.`);
 }).catch((err) => {
   console.error('Database migration failed:', err.message);
   process.exit(1);

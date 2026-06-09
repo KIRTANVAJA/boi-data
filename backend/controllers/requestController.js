@@ -118,7 +118,7 @@ export const getDashboardStats = async (req, res, next) => {
         SELECT TO_CHAR(createdAt, 'YYYY-MM-DD') as _id, COUNT(*) as count 
         FROM page_views 
         WHERE createdAt >= NOW() - INTERVAL '7 days' 
-        GROUP BY _id 
+        GROUP BY TO_CHAR(createdAt, 'YYYY-MM-DD') 
         ORDER BY _id ASC
       `);
     } else {
