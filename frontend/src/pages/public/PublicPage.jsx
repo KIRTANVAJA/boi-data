@@ -26,29 +26,6 @@ const PublicPage = () => {
   const [activeGalleryTab, setActiveGalleryTab] = useState('All');
   const [showUnlockModal, setShowUnlockModal] = useState(false);
 
-  if (loading || !portfolioData) {
-    return (
-      <div className="d-flex flex-column justify-content-center align-items-center vh-100 bg-black text-warning">
-        <div className="spinner-border mb-3" role="status" style={{ width: '3rem', height: '3rem' }}>
-          <span className="visually-hidden">Loading...</span>
-        </div>
-        <h5 className="text-gold-gradient fw-bold">Compiling Digital Biodata...</h5>
-      </div>
-    );
-  }
-
-  const personal = portfolioData?.personal || {};
-  const about = portfolioData?.about || {};
-  const education = portfolioData?.education || [];
-  const experience = portfolioData?.experience || [];
-  const skills = portfolioData?.skills || [];
-  const projects = portfolioData?.projects || [];
-  const certifications = portfolioData?.certifications || [];
-  const family = portfolioData?.family || {};
-  const gallery = portfolioData?.gallery || [];
-  const contact = portfolioData?.contact || {};
-  const lifestyle = portfolioData?.lifestyle || { hobbies: [], languages: [] };
-
   useEffect(() => {
     AOS.init({ duration: 1000, once: true });
     
@@ -76,6 +53,29 @@ const PublicPage = () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
   }, [isAuthenticated, navigate]);
+
+  if (loading || !portfolioData) {
+    return (
+      <div className="d-flex flex-column justify-content-center align-items-center vh-100 bg-black text-warning">
+        <div className="spinner-border mb-3" role="status" style={{ width: '3rem', height: '3rem' }}>
+          <span className="visually-hidden">Loading...</span>
+        </div>
+        <h5 className="text-gold-gradient fw-bold">Compiling Digital Biodata...</h5>
+      </div>
+    );
+  }
+
+  const personal = portfolioData?.personal || {};
+  const about = portfolioData?.about || {};
+  const education = portfolioData?.education || [];
+  const experience = portfolioData?.experience || [];
+  const skills = portfolioData?.skills || [];
+  const projects = portfolioData?.projects || [];
+  const certifications = portfolioData?.certifications || [];
+  const family = portfolioData?.family || {};
+  const gallery = portfolioData?.gallery || [];
+  const contact = portfolioData?.contact || {};
+  const lifestyle = portfolioData?.lifestyle || { hobbies: [], languages: [] };
 
   const scrollToTop = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
