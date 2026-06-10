@@ -46,6 +46,7 @@ export const createProject = async (req, res, next) => {
       ? JSON.stringify(projectData.tags) 
       : (projectData.tags || '');
 
+    console.log('Inserting project with order:', nextOrder, 'title:', projectData.title || 'Untitled Project');
     const result = await run(
       `INSERT INTO projects (title, description, image, tags, githubLink, demoLink, item_order)
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
@@ -295,6 +296,7 @@ export const createGalleryItem = async (req, res, next) => {
     const lastGallery = await queryOne('SELECT MAX(item_order) as maxOrder FROM gallery');
     const nextOrder = lastGallery && lastGallery.maxOrder !== null ? lastGallery.maxOrder + 1 : 0;
 
+    console.log('Inserting gallery item with order:', nextOrder, 'title:', data.title || 'Untitled', 'url:', data.mediaUrl);
     const result = await run(
       `INSERT INTO gallery (title, mediaUrl, mediaType, albumName, item_order)
        VALUES (?, ?, ?, ?, ?)`,

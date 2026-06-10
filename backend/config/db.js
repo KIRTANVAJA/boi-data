@@ -110,7 +110,8 @@ const camelCaseMap = {
   albumname: 'albumName',
   sectionorder: 'sectionOrder',
   sectionvisibility: 'sectionVisibility',
-  useragent: 'userAgent'
+  useragent: 'userAgent',
+  maxorder: 'maxOrder'
 };
 
 const normalizeRowKeys = (row) => {
