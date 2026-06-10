@@ -106,6 +106,15 @@ export const getFamily = async (req, res, next) => {
     family.motherDetails = safeParse(family.motherDetails);
     family.brothers = safeParse(family.brothers, []);
     family.sisters = safeParse(family.sisters, []);
+    
+    // Normalize brothers & sisters into combined siblings list for frontend compatibility
+    const brothersList = Array.isArray(family.brothers) ? family.brothers : [];
+    const sistersList = Array.isArray(family.sisters) ? family.sisters : [];
+    family.siblings = [
+      ...brothersList.map(b => ({ ...b, role: b.role || 'Brother' })),
+      ...sistersList.map(s => ({ ...s, role: s.role || 'Sister' }))
+    ];
+    family.backgroundText = family.familyBackground || '';
     family._id = family.id;
 
     res.status(200).json({ success: true, data: family });
@@ -124,10 +133,29 @@ export const updateFamily = async (req, res, next) => {
 
     const fatherDetails = req.body.fatherDetails !== undefined ? JSON.stringify(req.body.fatherDetails) : family.fatherDetails;
     const motherDetails = req.body.motherDetails !== undefined ? JSON.stringify(req.body.motherDetails) : family.motherDetails;
-    const brothers = req.body.brothers !== undefined ? JSON.stringify(req.body.brothers) : family.brothers;
-    const sisters = req.body.sisters !== undefined ? JSON.stringify(req.body.sisters) : family.sisters;
     const familyType = req.body.familyType !== undefined ? req.body.familyType : family.familyType;
-    const familyBackground = req.body.familyBackground !== undefined ? req.body.familyBackground : family.familyBackground;
+    const familyBackground = req.body.backgroundText !== undefined ? req.body.backgroundText : (req.body.familyBackground !== undefined ? req.body.familyBackground : family.familyBackground);
+
+    // Map combined siblings list back to separate brothers/sisters database columns
+    let brothers = family.brothers;
+    let sisters = family.sisters;
+    if (req.body.siblings !== undefined && Array.isArray(req.body.siblings)) {
+      const bList = [];
+      const sList = [];
+      req.body.siblings.forEach(sib => {
+        const roleLower = (sib.role || '').toLowerCase();
+        if (roleLower.includes('brother')) {
+          bList.push(sib);
+        } else {
+          sList.push(sib);
+        }
+      });
+      brothers = JSON.stringify(bList);
+      sisters = JSON.stringify(sList);
+    } else {
+      brothers = req.body.brothers !== undefined ? JSON.stringify(req.body.brothers) : family.brothers;
+      sisters = req.body.sisters !== undefined ? JSON.stringify(req.body.sisters) : family.sisters;
+    }
 
     await run(
       `UPDATE family SET fatherDetails = ?, motherDetails = ?, brothers = ?, sisters = ?, familyType = ?, familyBackground = ? WHERE id = ?`,
@@ -139,6 +167,15 @@ export const updateFamily = async (req, res, next) => {
     updatedFamily.motherDetails = safeParse(updatedFamily.motherDetails);
     updatedFamily.brothers = safeParse(updatedFamily.brothers, []);
     updatedFamily.sisters = safeParse(updatedFamily.sisters, []);
+    
+    // Re-normalize for the final response
+    const updatedBList = Array.isArray(updatedFamily.brothers) ? updatedFamily.brothers : [];
+    const updatedSList = Array.isArray(updatedFamily.sisters) ? updatedFamily.sisters : [];
+    updatedFamily.siblings = [
+      ...updatedBList.map(b => ({ ...b, role: b.role || 'Brother' })),
+      ...updatedSList.map(s => ({ ...s, role: s.role || 'Sister' }))
+    ];
+    updatedFamily.backgroundText = updatedFamily.familyBackground || '';
     updatedFamily._id = updatedFamily.id;
 
     await logActivity(req.user?.username || 'System', 'UPDATE_FAMILY', 'Updated family profile details', req);

@@ -261,7 +261,12 @@ export const deleteAchievement = async (req, res, next) => {
 export const getGallery = async (req, res, next) => {
   try {
     const media = await query('SELECT * FROM gallery ORDER BY item_order ASC, id DESC');
-    const formatted = media.map(m => ({ ...m, _id: m.id }));
+    const formatted = media.map(m => ({
+      ...m,
+      _id: m.id,
+      url: m.mediaUrl,
+      category: m.albumName
+    }));
     res.status(200).json({ success: true, data: formatted });
   } catch (error) {
     next(error);
@@ -271,13 +276,17 @@ export const getGallery = async (req, res, next) => {
 export const createGalleryItem = async (req, res, next) => {
   try {
     const data = { ...req.body };
+    const mediaUrlInput = req.body.url !== undefined ? req.body.url : req.body.mediaUrl;
+    const albumNameInput = req.body.category !== undefined ? req.body.category : req.body.albumName;
+
     if (req.file) {
       data.mediaUrl = await handleFileUpload(req.file);
       data.mediaType = req.file.mimetype.startsWith('video') ? 'video' : 'image';
     } else {
-      data.mediaUrl = data.mediaUrl || '';
+      data.mediaUrl = mediaUrlInput || '';
       data.mediaType = data.mediaType || 'image';
     }
+    data.albumName = albumNameInput || 'General';
 
     if (!data.mediaUrl) {
       return res.status(400).json({ success: false, error: 'Please upload media file or supply URL' });
@@ -293,13 +302,15 @@ export const createGalleryItem = async (req, res, next) => {
         data.title || '',
         data.mediaUrl,
         data.mediaType,
-        data.albumName || 'General',
+        data.albumName,
         nextOrder
       ]
     );
 
     const mediaItem = await queryOne('SELECT * FROM gallery WHERE id = ?', [result.id]);
     mediaItem._id = mediaItem.id;
+    mediaItem.url = mediaItem.mediaUrl;
+    mediaItem.category = mediaItem.albumName;
 
     await logActivity(req.user.username, 'CREATE_GALLERY_ITEM', `Uploaded gallery item: ${mediaItem.title || 'Untitled'}`, req);
 
