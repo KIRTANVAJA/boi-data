@@ -84,16 +84,59 @@ const translateSql = (sql) => {
   return sql;
 };
 
+const camelCaseMap = {
+  fullname: 'fullName',
+  nickname: 'nickname',
+  professionaltitle: 'professionalTitle',
+  shortintro: 'shortIntro',
+  statusbadge: 'statusBadge',
+  profileimage: 'profileImage',
+  bloodgroup: 'bloodGroup',
+  maritalstatus: 'maritalStatus',
+  mothertongue: 'motherTongue',
+  sociallinks: 'socialLinks',
+  contactinfo: 'contactInfo',
+  createdat: 'createdAt',
+  fatherdetails: 'fatherDetails',
+  motherdetails: 'motherDetails',
+  familytype: 'familyType',
+  familybackground: 'familyBackground',
+  futuregoals: 'futureGoals',
+  githublink: 'githubLink',
+  demolink: 'demoLink',
+  documenturl: 'documentUrl',
+  mediaurl: 'mediaUrl',
+  mediatype: 'mediaType',
+  albumname: 'albumName',
+  sectionorder: 'sectionOrder',
+  sectionvisibility: 'sectionVisibility',
+  useragent: 'userAgent'
+};
+
+const normalizeRowKeys = (row) => {
+  if (!row) return row;
+  const normalized = {};
+  for (const key of Object.keys(row)) {
+    const lowerKey = key.toLowerCase();
+    if (camelCaseMap[lowerKey]) {
+      normalized[camelCaseMap[lowerKey]] = row[key];
+    } else {
+      normalized[key] = row[key];
+    }
+  }
+  return normalized;
+};
+
 export const query = async (sql, params = []) => {
   const finalSql = translateSql(sql);
   if (usePostgres) {
     const res = await pgPool.query(finalSql, params);
-    return res.rows;
+    return res.rows.map(normalizeRowKeys);
   } else {
     return new Promise((resolve, reject) => {
       sqliteDb.all(finalSql, params, (err, rows) => {
         if (err) reject(err);
-        else resolve(rows);
+        else resolve(rows.map(normalizeRowKeys));
       });
     });
   }
@@ -103,12 +146,12 @@ export const queryOne = async (sql, params = []) => {
   const finalSql = translateSql(sql);
   if (usePostgres) {
     const res = await pgPool.query(finalSql, params);
-    return res.rows[0] || null;
+    return res.rows[0] ? normalizeRowKeys(res.rows[0]) : null;
   } else {
     return new Promise((resolve, reject) => {
       sqliteDb.get(finalSql, params, (err, row) => {
         if (err) reject(err);
-        else resolve(row || null);
+        else resolve(row ? normalizeRowKeys(row) : null);
       });
     });
   }

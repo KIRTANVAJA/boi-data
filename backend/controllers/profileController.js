@@ -46,7 +46,7 @@ export const updateProfile = async (req, res, next) => {
       professionalTitle: req.body.professionalTitle !== undefined ? req.body.professionalTitle : profile.professionalTitle,
       shortIntro: req.body.shortIntro !== undefined ? req.body.shortIntro : profile.shortIntro,
       statusBadge: req.body.statusBadge !== undefined ? req.body.statusBadge : profile.statusBadge,
-      profileImage: profile.profileImage,
+      profileImage: req.body.profileImage !== undefined ? req.body.profileImage : (req.body.avatarImage !== undefined ? req.body.avatarImage : profile.profileImage),
       age: req.body.age !== undefined ? parseInt(req.body.age) : profile.age,
       dob: req.body.dob !== undefined ? req.body.dob : profile.dob,
       gender: req.body.gender !== undefined ? req.body.gender : profile.gender,
